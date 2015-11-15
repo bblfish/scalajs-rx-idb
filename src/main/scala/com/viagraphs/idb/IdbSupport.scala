@@ -178,23 +178,27 @@ abstract class IdbSupport[K : W : R : ValidKey, V : W : R](var storeName: String
     implicit object implicitly extends StoreKeyPolicy[V] {
       def value(input: V): V = input
       def add(input: V, store: IDBObjectStore): IDBRequest = {
-        store.add(json.writeJs(writeJs[V](input)).asInstanceOf[js.Any])
+        println(s"====> adding $input to $store")
+        store.add(input.asInstanceOf[js.Any])
       }
       def put(input: V, store: IDBObjectStore): IDBRequest = {
-        store.put(json.writeJs(writeJs[V](input)).asInstanceOf[js.Any])
+        println(s"====> puting $input to $store")
+        store.put(input.asInstanceOf[js.Any])
       }
     }
     implicit object explicitly extends StoreKeyPolicy[(K,V)] {
       def value(input: (K,V)): V = input._2
       def add(input: (K,V), store: IDBObjectStore): IDBRequest = {
+        println(s"====> adding $input to $store")
         store.add(
-          json.writeJs(writeJs[V](input._2)).asInstanceOf[js.Any],
+          input._2.asInstanceOf[js.Any],
           json.writeJs(writeJs[K](input._1)).asInstanceOf[js.Any]
         )
       }
       def put(input: (K,V), store: IDBObjectStore): IDBRequest = {
+        println(s"====> putting $input to $store")
         store.put(
-          json.writeJs(writeJs[V](input._2)).asInstanceOf[js.Any],
+          input._2.asInstanceOf[js.Any],
           json.writeJs(writeJs[K](input._1)).asInstanceOf[js.Any]
         )
       }

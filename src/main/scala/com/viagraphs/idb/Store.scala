@@ -43,12 +43,12 @@ abstract class Index[K : W : R : ValidKey, V : W : R] protected (initialName: St
       result match {
         case Right(cursor) =>
           observer.onNext(
-            readJs[K](json.readJs(cursor.key)) -> readJs[V](json.readJs(cursor.value))
+            readJs[K](json.readJs(cursor.key)) -> cursor.value.asInstanceOf[V]
           )
         case Left((key,value)) =>
           (value : UndefOr[js.Any]).fold[Future[Ack]](Continue) { anyVal =>
             observer.onNext(
-              key -> readJs[V](json.readJs(anyVal))
+              key -> anyVal.asInstanceOf[V]
             )
           }
       }
@@ -115,7 +115,7 @@ class Store[K : W : R : ValidKey, V : W : R](initialName: String, dbRef: Atomic[
           val promise = Promise[Ack]()
           val key = readJs[K](json.readJs(cursor.key))
           val newVal = input.asInstanceOf[Key[K]].entries(key)
-          val req = cursor.update(json.writeJs(writeJs[V](newVal)).asInstanceOf[js.Any])
+          val req = cursor.update(newVal.asInstanceOf[js.Any])
           req.onsuccess = (e: Event) =>
             observer.onNext((key,newVal))
             promise.success(Continue)

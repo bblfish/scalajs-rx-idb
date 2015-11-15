@@ -81,7 +81,7 @@ def update[I, C[_]](input: C[I])(implicit p: StoreKeyPolicy[I], e: Tx[C]): Obser
 val obj1 = Map("x" -> 0) // store values might be anything that upickle manages to serialize
 val obj2 = Map("y" -> 1)
 val db = IndexedDb( // you may create new db, open, upgrade or recreate existing one
-  new NewDb("dbName", db => db.createObjectStore("storeName", lit("autoIncrement" -> true)))
+  OpenDb("dbName", db => db.createObjectStore("storeName", lit("autoIncrement" -> true)))
 )
 val store = db.openStore[Int,Map[String, Int]]("storeName") //declare Store's key and value type information
 // db requests should be combined with `onCompleteNewTx` combinator which honors idb transaction boundaries
