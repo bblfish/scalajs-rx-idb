@@ -57,7 +57,8 @@ class IndexedDb private(val dbRef: Atomic[Observable[IDBDatabase]]) {
    * @tparam V type of store values, it must have uPickle's Reader and Writer evidence
    * @return Store that requests are initiated from
    */
-  def openStore[K : W : R : ValidKey, V : W : R](name: String) = new Store[K, V](name, dbRef)
+  def openStore[K, V](name: String)(implicit ev: ValidKey[K], ev1: V => js.Any) =
+    new Store[K, V](name, dbRef)
 
   /**
    * @return observable of name of this database

@@ -1,16 +1,18 @@
 #scalajs-rx-idb
 
 
-Indexed Database reactive (Rx) wrapper written in [scala.js](1) using [monifu](2), [uPickle](3) and [uTest](4).
+Indexed Database reactive (Rx) wrapper written in [scala.js](1) using [monifu](2), [uTest](4).
 
 * dependency : `"com.viagraphs" %%% "scalajs-rx-idb" % "0.0.8-SNAPSHOT"`
 * Scala.js version : 0.6.5
+
+This is a special version that does not require uPicke. All classes serialised to indexDB must
+be pure javascript object, ie. the objects and all the fields must recursively inherit js.Any
 
 Primarily it is trying to be :
 
 ##type safe
 
-* thanks to [uPickle](3) and its Reader/Writer type classes user just declares input/return types and uPickle does the rest. It even allows you to deserialize objects in a type safe manner without knowing what type of object you're gonna get from database (See uPickle's tagged values in sealed hierarchies)
 * a key validation type class doesn't let you store keys of unsupported types
 * there is an abstraction over CRUD operations allowing seamlessly work with both scala collections and idb key ranges over store or index
 
@@ -76,6 +78,7 @@ def update[I, C[_]](input: C[I])(implicit p: StoreKeyPolicy[I], e: Tx[C]): Obser
 * Note that the crud operations accept either anything that is `Iterable` or any `com.viagraphs.idb.Store.Key`
 
 * working with iterables
+(check the tests. The code below must be adapted to be purely javascript objects. See test suite.)
 
 ```scala
 val obj1 = Map("x" -> 0) // store values might be anything that upickle manages to serialize

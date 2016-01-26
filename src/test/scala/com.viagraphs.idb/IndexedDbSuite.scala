@@ -8,10 +8,39 @@ import upickle._
 import utest._
 import utest.framework.TestSuite
 import scala.concurrent.Future
+import scala.scalajs.js
+import scala.scalajs.js.Dictionary
 import scala.scalajs.js.Dynamic.{literal => lit}
-case class AnInstance(a: String, b: Int, c: Map[Int,String])
+import scala.scalajs.js.annotation.ScalaJSDefined
+import scalaz.Equal
+
+@ScalaJSDefined
+class AnInstance(val a: String, val b: Int, val c: js.Array[js.Tuple2[Int,String]]) extends js.Object {
+  override def toString = s"AnInstance($a,$b,$c)"
+}
+
+object AnInstance {
+   implicit object anInstanceEqual extends Equal[AnInstance] {
+     override def equal(x: AnInstance, y: AnInstance) = x.a == y.a && x.b == y.b &&
+       x.c.length == y.c.length &&
+       !x.c.zip(y.c).exists { t =>
+         val answer = !(t._1._1 == t._2._1 && t._1._2 == t._2._2)
+         answer
+       }
+   }
+}
 
 object IndexedDbSuite extends TestSuite {
+  import scalaz.syntax.equal._
+
+  implicit def dictionaryEqual[X: Equal]: Equal[js.Dictionary[X]] = new Equal[js.Dictionary[X]] {
+    override def equal(a1: Dictionary[X], a2: Dictionary[X]) = {
+      a1.size == a2.size && a1.forall {
+        case (key,value) => a2.get(key).map(_ === value).getOrElse(false)
+      }
+    }
+  }
+
   // even async scheduler is supported, it honors transactions too and it seems to perform better
   implicit val scheduler = Scheduler.trampoline()
 
@@ -108,7 +137,7 @@ object IndexedDbSuite extends TestSuite {
 
     "get-by-index-using-iterable" - {
       val dbName = "get-by-index-using-iterable"
-      val obj = AnInstance("indexValue", 1, Map(1 -> "bar"))
+      val obj = new AnInstance("indexValue", 1, js.Array(1 -> "bar"))
       val db = IndexedDb(recreateDB(dbName))
       val store = db.openStore[Int,AnInstance](dbName)
       val index = store.index[String]("testIndex")
@@ -116,6 +145,7 @@ object IndexedDbSuite extends TestSuite {
         assert(appendTuples.length == 1)
         index.get(List("indexValue")).onCompleteNewTx { tuples =>
           assert(tuples.length == 1)
+          assert(tuples(0)._2 === obj)
           db.close()
         }
       }.asFuture
@@ -123,7 +153,7 @@ object IndexedDbSuite extends TestSuite {
 
     "get-by-index-using-keyRange" - {
       val dbName = "get-by-index-using-keyRange"
-      val obj = AnInstance("indexValue", 1, Map(1 -> "bar"))
+      val obj = new AnInstance("indexValue", 1, js.Array(1 -> "bar"))
       val db = IndexedDb(recreateDB(dbName))
       val store = db.openStore[Int,AnInstance](dbName)
       val index = store.index[String]("testIndex")
@@ -131,6 +161,7 @@ object IndexedDbSuite extends TestSuite {
         assert(appendTuples.length == 1)
         index.get(index.lastKey()).onCompleteNewTx { tuples =>
           assert(tuples.length == 1)
+          assert(tuples(0)._2 === obj)
           db.close()
         }
       }.asFuture
@@ -138,7 +169,7 @@ object IndexedDbSuite extends TestSuite {
 
     "append-and-get-object" - {
       val dbName = "append-and-get-object"
-      val obj = AnInstance("foo", 1, Map(1 -> "bar"))
+      val obj = new AnInstance("foo", 1, js.Array(1 -> "bar"))
       val db = IndexedDb(recreateDB(dbName))
       val store = db.openStore[Int,AnInstance](dbName)
       store.add(List(obj)).onCompleteNewTx { appendTuples =>
@@ -149,7 +180,7 @@ object IndexedDbSuite extends TestSuite {
         assert(key == 1)
         store.get(key :: Nil).onCompleteNewTx { getTuples =>
           assert(getTuples.length == 1)
-          assert(obj == getTuples(0)._2)
+          assert(obj === getTuples(0)._2)
           db.close()
         }
       }.asFuture
@@ -172,18 +203,21 @@ object IndexedDbSuite extends TestSuite {
     }
 
     "append-and-get-then-delete" - {
+      import scalaz.std.anyVal.intInstance
+
       val dbName = "append-and-get-then-delete"
-      val obj1 = Map("x" -> 0)
-      val obj2 = Map("y" -> 1)
+      val obj1 = js.Dictionary[Int]("x" -> 0)
+      val obj2 = js.Dictionary[Int]("y" -> 1)
       val db = IndexedDb(recreateDB(dbName))
-      val store = db.openStore[Int,Map[String, Int]](dbName)
+      val store = db.openStore[Int,js.Dictionary[Int]](dbName)
       store.add(List(obj1, obj2)).onCompleteNewTx { appendTuples =>
         assert(appendTuples.length == 2)
         val (keys, values) = appendTuples.unzip
-        assert(values.head == Map("x" -> 0))
+        assert(values.head === obj1)
         store.get(keys).onCompleteNewTx { getTuples =>
           val (keys2, values2) = getTuples.unzip
-          assert(values2 == Seq(obj1, obj2))
+          assert(values2(0) === obj1)
+          assert(values2(1) === obj2)
           store.delete(keys2).onCompleteNewTx { whatever =>
             store.count.onCompleteNewTx { counts =>
               assert(counts(0) == 0)

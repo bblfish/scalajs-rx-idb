@@ -22,10 +22,10 @@ object Build extends sbt.Build {
         libraryDependencies ++= Seq(
           "org.scala-js" %%% "scalajs-dom" % "0.8.1",
           "org.monifu" %%% "monifu" % "1.0-RC3",
-          "com.lihaoyi" %%% "upickle" % "0.3.6",
-          "com.lihaoyi" %%% "utest" % "0.3.1" % "test"
+          "com.lihaoyi" %%% "utest" % "0.3.1" % "test",
+          "com.github.japgolly.fork.scalaz" %%% "scalaz-core" % "7.2.0" % "test"
         ),
-        scalaJSStage := FastOptStage,
+        scalaJSUseRhino := false,
         testFrameworks += new TestFramework("utest.runner.Framework"),
         autoAPIMappings := true,
         requiresDOM := true,

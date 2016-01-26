@@ -8,7 +8,7 @@ import scala.scalajs.js
 /**
  * Mixin this trait with Store to enable request logging and profiling
  */
-trait Spy[K,V] extends Store[K,V] {
+trait Spy[K, V] extends Store[K,V] {
   implicit val scheduler = IndexedDb.scheduler
 
   val stats = ListBuffer[Entry]()

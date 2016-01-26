@@ -13,7 +13,13 @@ import scala.language.higherKinds
 import scala.scalajs.js
 import scala.scalajs.js.UndefOr
 
-abstract class Index[K : W : R : ValidKey, V : W : R] protected (initialName: String, dbRef: Atomic[Observable[IDBDatabase]]) extends IdbSupport[K,V](initialName, dbRef) {
+abstract class Index[K, V] protected (
+  initialName: String,
+  dbRef: Atomic[Observable[IDBDatabase]]
+)(implicit
+  ev1: ValidKey[K],
+  ev2: V => js.Any
+) extends IdbSupport[K,V](initialName, dbRef) {
   def indexName: String
 
   /**
@@ -29,21 +35,21 @@ abstract class Index[K : W : R : ValidKey, V : W : R] protected (initialName: St
       case Right(keyRange) =>
         store.openCursor(keyRange.range, keyRange.direction.value)
       case Left(key) =>
-        store.get(json.writeJs(writeJs[K](key)).asInstanceOf[js.Any])
+        store.get(key.asInstanceOf[js.Any])
     }
 
     def execute(store: IDBObjectStore, input: Either[K, Key[K]]) = input match {
       case Right(keyRange) =>
         store.openCursor(keyRange.range, keyRange.direction.value)
       case Left(key) =>
-        store.get(json.writeJs(writeJs[K](key)).asInstanceOf[js.Any])
+        store.get(key.asInstanceOf[js.Any])
     }
 
     def onSuccess(result: Either[(K, js.Any), IDBCursorWithValue], observer: Observer[(K, V)]): Future[Ack] = {
       result match {
         case Right(cursor) =>
           observer.onNext(
-            readJs[K](json.readJs(cursor.key)) -> cursor.value.asInstanceOf[V]
+            cursor.key.asInstanceOf[K] -> cursor.value.asInstanceOf[V]
           )
         case Left((key,value)) =>
           (value : UndefOr[js.Any]).fold[Future[Ack]](Continue) { anyVal =>
@@ -59,9 +65,15 @@ abstract class Index[K : W : R : ValidKey, V : W : R] protected (initialName: St
   }
 }
 
-class Store[K : W : R : ValidKey, V : W : R](initialName: String, dbRef: Atomic[Observable[IDBDatabase]]) extends Index[K,V](initialName, dbRef) {
+class Store[K, V](
+  initialName: String,
+  dbRef: Atomic[Observable[IDBDatabase]]
+)(implicit
+  ev: ValidKey[K],
+  ev1: V => js.Any
+) extends Index[K,V](initialName, dbRef) {
 
-  def index[IK : W : R : ValidKey](name: String) = new Index[IK, V](storeName, dbRef) {
+  def index[IK: ValidKey](name: String) = new Index[IK, V](storeName, dbRef) {
     def indexName: String = name
   }
 
@@ -84,7 +96,7 @@ class Store[K : W : R : ValidKey, V : W : R](initialName: String, dbRef: Atomic[
       def onSuccess(result: Either[(I, js.Any), IDBCursorWithValue], observer: Observer[(K, V)]): Future[Ack] = {
         result match {
           case Left((in, key)) =>
-            observer.onNext(readJs[K](json.readJs(key)) -> p.value(in))
+            observer.onNext(key.asInstanceOf[K] -> p.value(in))
           case _ =>
             throw new IllegalStateException("Cannot happen, add doesn't support KeyRanges")
         }
@@ -96,7 +108,8 @@ class Store[K : W : R : ValidKey, V : W : R](initialName: String, dbRef: Atomic[
 
   /**
    * Updates store records matching keys with entries
-   * @param input records to update - either [[scala.collection.Iterable]] or [[com.viagraphs.idb.IdbSupport.Key]] with entries containing new values
+    *
+    * @param input records to update - either [[scala.collection.Iterable]] or [[com.viagraphs.idb.IdbSupport.Key]] with entries containing new values
    * @return observable of the updated key-value pairs (the new values)
    */
   def update[I, C[_]](input: C[I])(implicit p: StoreKeyPolicy[I], e: Tx[C]): Observable[(K,V)] = new Request[I, (K,V), C](input, e) {
@@ -113,7 +126,7 @@ class Store[K : W : R : ValidKey, V : W : R](initialName: String, dbRef: Atomic[
       result match {
         case Right(cursor) =>
           val promise = Promise[Ack]()
-          val key = readJs[K](json.readJs(cursor.key))
+          val key = cursor.key.asInstanceOf[K]
           val newVal = input.asInstanceOf[Key[K]].entries(key)
           val req = cursor.update(newVal.asInstanceOf[js.Any])
           req.onsuccess = (e: Event) =>
@@ -125,7 +138,7 @@ class Store[K : W : R : ValidKey, V : W : R](initialName: String, dbRef: Atomic[
           }
           promise.future
         case Left((entry, key)) =>
-          observer.onNext(readJs[K](json.readJs(key)) -> p.value(entry))
+          observer.onNext(key.asInstanceOf[K] -> p.value(entry))
       }
     }
     def onError(input: Option[I]) = s"updating ${input.getOrElse("")} from $storeName failed"
@@ -133,7 +146,8 @@ class Store[K : W : R : ValidKey, V : W : R](initialName: String, dbRef: Atomic[
 
   /**
    * Delete records by keys
-   * @param keys of records to delete
+    *
+    * @param keys of records to delete
    * @return empty observable that either completes or errors out when records are deleted
    */
   def delete[C[_]](keys: C[K])(implicit e: Tx[C]): Observable[Nothing] = new Request[K, Nothing, C](keys, e) {
@@ -143,7 +157,7 @@ class Store[K : W : R : ValidKey, V : W : R](initialName: String, dbRef: Atomic[
       case Right(keyRange) =>
         store.openCursor(keyRange.range, keyRange.direction.value)
       case Left(key) =>
-        store.delete(json.writeJs(writeJs[K](key)).asInstanceOf[js.Any])
+        store.delete(key.asInstanceOf[js.Any])
     }
 
     def onSuccess(result: Either[(K, js.Any), IDBCursorWithValue], observer: Observer[Nothing]): Future[Ack] = {
