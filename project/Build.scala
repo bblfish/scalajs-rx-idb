@@ -1,3 +1,5 @@
+import bintray.Plugin._
+import bintray.Keys._
 import org.scalajs.sbtplugin.ScalaJSPlugin
 import org.scalajs.sbtplugin.ScalaJSPlugin.autoImport._
 import sbt.Keys._
@@ -8,10 +10,10 @@ object Build extends sbt.Build {
   lazy val `scalajs-rx-idb` =
     project.in(file("."))
       .enablePlugins(ScalaJSPlugin)
-      .settings(
+      .settings( publicationSettings ++ Seq(
         organization := "com.viagraphs",
         name := "scalajs-rx-idb",
-        version := "0.0.8-SNAPSHOT",
+        version := "0.0.8-lean-SNAPSHOT",
         scalaVersion := "2.11.7",
         scalacOptions ++= Seq(
           "-unchecked", "-deprecation", "-feature", "-Xfatal-warnings",
@@ -33,13 +35,6 @@ object Build extends sbt.Build {
         publishMavenStyle := true,
         publishArtifact in Test := false,
         pomIncludeRepository := { _ => false },
-        publishTo := {
-          val nexus = "https://oss.sonatype.org/"
-          if (isSnapshot.value)
-            Some("snapshots" at nexus + "content/repositories/snapshots")
-          else
-            Some("releases"  at nexus + "service/local/staging/deploy/maven2")
-        },
         pomExtra :=
           <url>https://github.com/viagraphs/scalajs-rx-idb</url>
             <licenses>
@@ -60,5 +55,32 @@ object Build extends sbt.Build {
                 <email>liska.jakub@gmail.com</email>
               </developer>
             </developers>
-      )
+      ))
+
+  //sbt -Dbanana.publish=bblfish.net:/home/hjs/htdocs/work/repo/
+  //sbt -Dbanana.publish=bintray
+  def publicationSettings =
+    (Option(System.getProperty("banana.publish")) match {
+      case Some("bintray") => Seq(
+        // bintray
+        repository in bintray := "banana-rdf",
+        bintrayOrganization in bintray := None
+      ) ++ bintrayPublishSettings
+      case opt: Option[String] => {
+        Seq(
+          publishTo <<= version { (v: String) =>
+            val nexus = "https://oss.sonatype.org/"
+            val other = opt.map(_.split(":"))
+            if (v.trim.endsWith("SNAPSHOT")) {
+              val repo = other.map(p => Resolver.ssh("banana.publish specified server", p(0), p(1) + "snapshots"))
+              repo.orElse(Some("snapshots" at nexus + "content/repositories/snapshots"))
+            } else {
+              val repo = other.map(p => Resolver.ssh("banana.publish specified server", p(0), p(1) + "releases"))
+              repo.orElse(Some("releases" at nexus + "service/local/staging/deploy/maven2"))
+            }
+          }
+        )
+      }
+    }) ++ Seq(publishArtifact in Test := false)
+
 }
