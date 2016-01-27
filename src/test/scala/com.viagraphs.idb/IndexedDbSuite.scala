@@ -4,9 +4,9 @@ import com.viagraphs.idb.IdbSupport._
 import monifu.concurrent.Scheduler
 import monifu.reactive.Observable
 import org.scalajs.dom.raw.IDBKeyRange
-import upickle._
 import utest._
 import utest.framework.TestSuite
+
 import scala.concurrent.Future
 import scala.scalajs.js
 import scala.scalajs.js.Dictionary
@@ -23,10 +23,7 @@ object AnInstance {
    implicit object anInstanceEqual extends Equal[AnInstance] {
      override def equal(x: AnInstance, y: AnInstance) = x.a == y.a && x.b == y.b &&
        x.c.length == y.c.length &&
-       !x.c.zip(y.c).exists { t =>
-         val answer = !(t._1._1 == t._2._1 && t._1._2 == t._2._2)
-         answer
-       }
+       x.c.zip(y.c).forall(t => t._1._1 == t._2._1 && t._1._2 == t._2._2)
    }
 }
 
